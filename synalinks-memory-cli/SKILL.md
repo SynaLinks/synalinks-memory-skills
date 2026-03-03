@@ -3,12 +3,12 @@ name: synalinks-memory-cli
 description: >
   Use the Synalinks Memory CLI to interact with the Synalinks Memory knowledge layer
   for AI agents. This skill covers uploading data, querying predicates (tables,
-  concepts, rules), asking natural language questions, searching, and exporting data.
+  concepts, rules), chatting with the agent, searching, and exporting data.
   Trigger this skill whenever the user mentions Synalinks Memory, wants to add data to
-  their knowledge base, query tables/concepts/rules, ask questions over their data
-  using the Synalinks agent, export predicate data, or manage their Synalinks Memory
-  instance from the terminal. Also trigger when you see references to the `synalinks`
-  CLI command, Synalinks predicates, or the SYNALINKS_API_KEY environment variable.
+  their knowledge base, query tables/concepts/rules, chat with the agent over their data,
+  export predicate data, or manage their Synalinks Memory instance from the terminal.
+  Also trigger when you see references to the `synalinks` CLI command, Synalinks
+  predicates, or the SYNALINKS_API_KEY environment variable.
 ---
 
 # Synalinks Memory CLI
@@ -49,7 +49,13 @@ uvx synalinks-memory-cli list
 
 ### Authentication
 
-The CLI requires a Synalinks API key. Set it as an environment variable:
+A **Synalinks API key** is required to authenticate with your knowledge base.
+
+When you create a knowledge base on [app.synalinks.com](https://app.synalinks.com), a **default API key** is generated automatically with read/write access and no predicate restrictions — you can use it right away.
+
+To create a key with granular access, go to **Profile icon** (in the header) > **API Keys** > **Create API Key**.
+
+Set it as an environment variable:
 
 ```bash
 export SYNALINKS_API_KEY="synalinks_..."
@@ -64,11 +70,16 @@ synalinks-memory-cli --api-key "synalinks_..." list
 You can also override the API base URL with `--base-url` if connecting to a
 custom instance.
 
-To get your API key, you need a `starter` or `pro` plan at [https://app.synalinks.com](https://app.synalinks.com)
-
 ## Commands
 
-### Ask a natural language question
+### Chat with the agent
+
+**IMPORTANT: Only use the chat command when no existing concepts or rules can answer
+the user's need.** Always check first with `list` and `execute` — if a relevant
+concept or rule already exists, query it directly instead. The chat command triggers
+the knowledge engineer agent, which is expensive and slow. Use it only to teach the
+system something new (creating new concepts/rules) or when the existing predicates
+genuinely cannot answer the question.
 
 The default behavior — no subcommand needed. Just type your question:
 
@@ -77,12 +88,21 @@ synalinks-memory-cli "What were the top 5 products by revenue last month?"
 synalinks-memory-cli How are sales doing this quarter
 ```
 
-This streams the question to Synalinks knowledge engineer agent, which reasons 
-over your data using logical rules and returns an answer rendered as Markdown. 
+This streams the question to the Synalinks knowledge engineer agent, which reasons
+over your data using logical rules and returns an answer rendered as Markdown.
 The system learns new concepts and rules as it answers, so each question makes
 the knowledge base smarter.
 
 Quotes are optional — multi-word questions work with or without them.
+
+Chat is **multi-turn** — conversation history is persisted to disk
+(`~/.synalinks/chat_history.json`) so follow-up questions have full context
+across CLI invocations. The MCP server also preserves history in-memory across
+calls. To reset the conversation and start fresh, use `/clear`:
+
+```bash
+synalinks-memory-cli /clear
+```
 
 ### Add data
 
@@ -99,6 +119,24 @@ Options:
 - `--overwrite` — replace an existing table with the same name
 
 The command prints the predicate name, column names, and row count on success.
+
+### Insert a row
+
+Insert a single row into a table. The argument is a JSON object mapping column
+names to values:
+
+```bash
+synalinks-memory-cli insert Users '{"name": "Alice", "email": "alice@example.com"}'
+```
+
+### Update rows
+
+Update rows in a table that match a filter. Takes two JSON arguments: a filter
+(column→value conditions, ANDed) and the values to set:
+
+```bash
+synalinks-memory-cli update Users '{"name": "Alice"}' '{"email": "alice@new.com"}'
+```
 
 ### List predicates
 
@@ -123,9 +161,10 @@ Options:
 - `--limit`, `-n` — max rows to return (default 20)
 - `--offset` — row offset for pagination (default 0)
 
-#### Export to file
+#### Export data
 
-Add `--format` to save data instead of printing it:
+Add `--format` to output formatted data. Without `-o` it prints to stdout (pipeable);
+with `-o` it saves to a file:
 
 ```bash
 synalinks-memory-cli execute Users --format csv
@@ -134,8 +173,8 @@ synalinks-memory-cli execute Users -f json --limit 500
 ```
 
 Options:
-- `--format`, `-f` — one of `json`, `csv`, `parquet`
-- `--output`, `-o` — output file path (defaults to `<predicate>.<format>`)
+- `--format`, `-f` — one of `json`, `csv`, `parquet` (prints to stdout if no `-o`)
+- `--output`, `-o` — save to file instead of stdout
 
 ### Search
 
@@ -168,17 +207,24 @@ synalinks-memory-cli execute Customers --limit 10
 synalinks-memory-cli search Customers "acme corp"
 ```
 
-### Workflow 2: Ask questions and build knowledge
+### Workflow 2: Chat and build knowledge
+
+**Always check existing predicates first** — only use chat when no concept or rule
+already answers the question:
 
 ```bash
-# Ask questions — the system learns concepts and rules automatically
+# 1. Check what already exists
+synalinks-memory-cli list
+
+# 2. If a relevant concept/rule exists, query it directly (fast, free)
+synalinks-memory-cli execute HighValueCustomers
+
+# 3. Only chat when the knowledge doesn't exist yet (creates new concepts/rules)
 synalinks-memory-cli "Which customers have the highest lifetime value?"
 synalinks-memory-cli "What's the average order size by region?"
 
-# List predicates to see newly learned concepts and rules
+# 4. Newly learned concepts and rules are now available for direct queries
 synalinks-memory-cli list
-
-# Query a derived concept directly
 synalinks-memory-cli execute HighValueCustomers
 ```
 
@@ -202,9 +248,9 @@ All errors print to stderr with a `[red]Error:[/red]` prefix. Common issues:
 - **Missing API key** — set `SYNALINKS_API_KEY` or pass `--api-key`
 - **Unknown predicate** — check the name with `synalinks list`
 - **File not found** — verify the path passed to `synalinks add`
-- **`--output` without `--format`** — you must specify a format when using `-o`
+- **`--output` without `--format`** — `-o` requires `--format` to be set
 
 ## Technical Details
 
 For deeper reference on the CLI internals, Python SDK types, and the streaming
-ask protocol, see [synalinks-memory-cli](https://github.com/SynaLinks/synalinks-memory-cli).
+chat protocol, see [synalinks-memory-cli](https://github.com/SynaLinks/synalinks-memory-cli).
