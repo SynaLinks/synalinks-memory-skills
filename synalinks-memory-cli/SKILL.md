@@ -178,11 +178,13 @@ Options:
 
 ### Search
 
-Fuzzy keyword search within a predicate:
+Search within a predicate using regex patterns (case-insensitive, space=AND, pipe=OR):
 
 ```bash
-synalinks-memory-cli search Users "alice"
-synalinks-memory-cli search Products "wireless headphones" --limit 10
+synalinks-memory-cli search Users "alice"              # simple pattern
+synalinks-memory-cli search Users "alice|bob"          # OR: matches alice OR bob
+synalinks-memory-cli search Users "alice bob"          # AND: matches rows with both
+synalinks-memory-cli search Products "wireless" --limit 10
 ```
 
 Options:

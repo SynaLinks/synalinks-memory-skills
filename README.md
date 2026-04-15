@@ -21,7 +21,7 @@ Teaches Claude Code how to use the [Synalinks Memory CLI](https://github.com/Syn
 - **Uploading data** — add CSV/Parquet files as tables
 - **Querying predicates** — fetch rows from tables, concepts, and rules
 - **Chatting with the agent** — stream natural language questions to the knowledge engineer agent (multi-turn)
-- **Searching** — fuzzy keyword search within any predicate
+- **Searching** — regex pattern search within any predicate
 - **Exporting** — save predicate data as CSV, Parquet, or JSON
 
 The skill activates automatically when you mention Synalinks Memory, the `synalinks-memory-cli` command, predicates, or the `SYNALINKS_API_KEY` environment variable.
